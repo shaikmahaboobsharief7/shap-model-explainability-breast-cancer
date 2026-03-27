@@ -17,6 +17,15 @@ jupyter notebook shap_explainability_tutorial.ipynb
 
 ```
 ----------------------------------------------------------------------------------------
+## How to View the Webpage
+
+To view the tutorial webpage navigate to webpage folder and open the `index.html` file in your web browser.
+
+Make sure the `styles.css` file and `images/` folder are in the same directory as `index.html` so that all styles and visuals load correctly.
+
+----------------------------------------------------------------------------------------
+
+
 # SHAP Explainability Tutorial: Interpreting Machine Learning Predictions
 
 ## Project Overview
