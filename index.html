@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Explaining ML Predictions with SHAP Breast Cancer Tutorial</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="hero">
+  <span class="hero-eyebrow">Machine Learning Tutorial — Explainable Artificial Intelligence</span>
+
+  <h1>Opening the <em>Black Box</em><br>in Cancer Diagnosis</h1>
+
+  <p class="hero-sub">
+    A tutorial on explaining machine learning predictions with SHAP, from raw data to clinical transparency.
+  </p>
+
+  <div class="hero-meta">
+    <span>Breast Cancer Wisconsin Dataset</span>
+    <span>Random Forest Classifier</span>
+    <span>SHAP Explainability</span>
+  </div>
+
+  <div class="hero-link">
+    <a href="https://github.com/shaikmahaboobsharief7/shap-model-explainability-breast-cancer" target="_blank">
+      <img src="images/github.png" alt="GitHub" class="github-icon">
+      View Project on GitHub
+    </a>
+  </div>
+
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    scroll
+  </div>
+</header>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#intro">Introduction</a>
+    <a href="#dataset">Dataset</a>
+    <a href="#evaluation">Evaluation</a>
+    <a href="#accuracy">Accuracy</a>
+    <a href="#shap">SHAP</a>
+    <a href="#model-link">Model Link</a>
+    <a href="#global">Global</a>
+    <a href="#local">Local</a>
+    <a href="#dependence">Dependence</a>
+    <a href="#insights">Insights</a>
+    <a href="#ethics">Ethics</a>
+    <a href="#conclusion">Conclusion</a>
+  </div>
+</nav>
+
+<main>
+
+  <section class="section" id="intro">
+    <div class="section-label">01 — Introduction</div>
+    <h2>The Problem with Accuracy Alone</h2>
+
+    <p class="story-lead">
+      Imagine a radiologist receiving an AI verdict: <em>"Malignant, 97% confidence."</em>
+      The number is impressive. But which measurement tipped the scale?
+      Without an answer, how can any clinician stake a patient's treatment on it?
+    </p>
+
+    <p>
+      Machine learning is reshaping oncology, drug discovery, and diagnostics at a remarkable pace. Yet most high-performing models, particularly models like Random Forests, operate as <strong>black boxes</strong> they consume data, produce predictions, and reveal nothing about their internal reasoning. In low-stakes applications this is merely inconvenient in healthcare it can be dangerous.
+    </p>
+
+    <p>
+      This tutorial traces the full lifecycle of an explainable AI project. Starting from a real breast-cancer dataset, we train a powerful classifier examine its limitations then apply <strong>SHAP (SHapley Additive exPlanations)</strong> to expose exactly what the model has learned and why that transparency matters.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="dataset">
+    <div class="section-label">02 — Dataset and Model Overview</div>
+    <h2>The Data Behind the Diagnosis</h2>
+
+    <p>
+      The <strong>Breast Cancer Wisconsin Dataset</strong> contains digitised measurements from biopsies of breast masses. Each of the 569 samples is described by <strong>30 numerical features</strong> capturing cell nucleus size, shape, and texture, and is labelled either Malignant (212 cases) or Benign (357 cases).
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num">569</div>
+        <div class="stat-label">Patient samples</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">30</div>
+        <div class="stat-label">Input features</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num amber">357</div>
+        <div class="stat-label">Benign cases</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num rose">212</div>
+        <div class="stat-label">Malignant cases</div>
+      </div>
+    </div>
+
+    <p>
+      Features are organised into <strong>mean</strong>, <strong>standard error</strong>, and <strong>worst</strong> measurements per characteristic. The <em>worst</em> suffix captures peak abnormality values which, as SHAP will confirm, carry the greatest predictive weight. Two non-informative columns, a patient <code>id</code> and an empty <code>Unnamed: 32</code>, were removed during preprocessing. The target was encoded as <strong>1 = Malignant</strong> and <strong>0 = Benign</strong>, and the data was split 80/20 preserve class proportions in both sets.
+    </p>
+
+    <h3>The Classifier - Random Forest</h3>
+    <p>
+      A Random Forest of 100 decision trees was trained on the 455-sample training set. Each tree learns from a different random subset of the data the final prediction is determined by majority vote across all trees. This ensemble approach reduces overfitting while remaining robust to the slight class imbalance present in the dataset.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="evaluation">
+    <div class="section-label">03 — Model Evaluation</div>
+    <h2>How Well Does the Model Perform?</h2>
+
+    <p>
+      Before seeking explanations it is important to understand what the model achieved. I have used the Confusion Matrix and the ROC Curve to completly understand its strengths and residual weaknesses on the 114-sample test set.
+    </p>
+
+    <h3>Confusion Matrix</h3>
+    <p>
+      A confusion matrix maps every prediction against its true label across four outcomes True Positives, True Negatives, False Positives, and False Negatives which are malignant cases that the model misses entirely.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/confusion_matrix.png" alt="Confusion Matrix: 72 true negatives, 0 false positives, 3 false negatives, 39 true positives" />
+      <div class="fig-caption">Confusion Matrix — test set (n = 114)</div>
+    </div>
+
+    <div class="callout amber">
+      <div class="callout-title">Reading the Matrix</div>
+      <p style="margin:0; font-size:0.91rem;">
+        The model correctly classified all <strong>72 benign cases</strong> which means zero false positives and <strong>39 of 42 malignant cases</strong>. The 3 false negatives, real cancers predicted as benign, represent the model's most critical failure. In oncology, a missed malignancy can delay treatment by months.
+      </p>
+    </div>
+
+    <h3>ROC Curve</h3>
+    <p>
+      The ROC curve helps us to show how model performs at all possible points of dicision making plotting the true positive rate against the false positive rate.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/ROC_curve.png" alt="ROC Curve with AUC of 0.99" />
+      <div class="fig-caption">ROC Curve — AUC = 0.99</div>
+    </div>
+
+    <div class="callout amber">
+      <div class="callout-title">Reading the Matrix</div>
+      <p style="margin:0; font-size:0.91rem;">
+        An AUC of <strong>0.99</strong> indicates near-perfect ability to rank malignant cases above benign ones. Yet even here excellence is not transparency we still cannot explain why the model is right, or diagnose why it occasionally fails.
+      </p>
+    </div>
+    
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="accuracy">
+    <div class="section-label">04 — Why Accuracy Is Not Enough</div>
+    <h2>The Gap Between Performance and Understanding</h2>
+
+    <p class="story-lead">
+      97% accuracy sounds reassuring until question arrises, which three patients did the model miss and <em>why</em>?
+    </p>
+
+    <p>
+      High accuracy can hide important problems. A model might look good overall but still make some mistakes for cetain groups or rare cases or new data thats different from what its has been trained of.
+    </p>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>With High Accuracy Alone</th>
+          <th>What We Still Cannot Do</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Predict benign vs malignant with 97% overall correctness</td>
+          <td class="tag-bad">Explain which features drove any individual prediction</td>
+        </tr>
+        <tr>
+          <td>Achieve AUC of 0.99 across thresholds</td>
+          <td class="tag-bad">Identify why the 3 missed malignancies were mislabelled</td>
+        </tr>
+        <tr>
+          <td>Generalise reasonably to held-out data</td>
+          <td class="tag-bad">Check if the model uses misleading patterns</td>
+        </tr>
+        <tr>
+          <td>Meet overall performance target</td>
+          <td class="tag-bad">Gain the trust or meet regulatory review</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      This gap between predictive performance and human understanding is precisely why <strong>Explainable AI (XAI)</strong> has become indispensable in high-stakes fields. The solution we turn to is SHAP.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="shap">
+    <div class="section-label">05 — Introduction to SHAP</div>
+    <h2>SHapley Additive exPlanations (SHAP)</h2>
+
+    <p>
+      <strong>SHAP</strong> was introduced by Lundberg and Lee (2017) as a unified framework for interpreting any machine learning model. Its foundation is <em>Shapley values</em> from cooperative game theory, developed by Lloyd Shapley in 1953.
+    </p>
+
+    <div class="callout blue">
+      <div class="callout-title">The Game Theory Analogy</div>
+      <p style="margin:0; font-size:0.91rem;">
+        Think of the model's features as a team collaborating to produce a prediction. Shapley values answer <strong>"How much credit does each player deserve?"</strong> Each feature's contribution is averaged across every possible ordering of features guaranteeing fairness, consistency, and local accuracy.
+      </p>
+    </div>
+
+    <h3>How SHAP Works</h3>
+    <p>
+      The model carries a <strong>baseline prediction</strong>, roughly 0.37 in this project, reflecting the proportion of malignant cases in the training set. For any individual patient, each feature either raises or lowers that baseline. SHAP calculates the exact magnitude and direction of each adjustment. adding all feature contributions plus the baseline precisely reconstructs the models output making the explanation both complete and verifiable. Unlike traditional feature importance SHAP operates at two levels simultaneously:
+    </p>
+
+    <ul class="insight-list">
+      <li><strong>Global level</strong> — which features matter most across the entire dataset.</li>
+      <li><strong>Local level</strong> — exactly how each feature influenced one specific patients prediction.</li>
+    </ul>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="model-link">
+    <div class="section-label">06 — SHAP and the Trained Model</div>
+    <h2>Correlating SHAP With Random Forest</h2>
+
+    <p>
+      To calculate SHAP values for the Random Forest, the <strong>TreeExplainer</strong> method was used. It is designed for tree-based models and uses the tree structure to give accurate and fast results without using approximations. The explainer was applied to 114 test samples with 30 features, creating SHAP values with shape (114, 30, 2), where the last part represents the two classes. All explanations below focus on <strong>class 1 (Malignant)</strong>, with a base value of <strong>0.373</strong>.
+    </p>
+
+    <div class="callout">
+      <div class="callout-title">Why TreeSHAP?</div>
+      <p style="margin:0; font-size:0.91rem;">
+        TreeSHAP runs in polynomial time rather than the exponential time required for exact Shapley computation in general models. This makes it ideal for Random Forests with 100 trees and 30 features, while still keeping the theoretical explanation
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="global">
+    <div class="section-label">07 — Global Explanations</div>
+    <h2>What Insights Has The Model Captured Globally?</h2>
+
+    <h3>SHAP Summary Plot</h3>
+    <p>
+      Every dot represents one patient observation. Features are ranked by total impact horizontal position shows whether a feature pushed toward malignancy (right) or benign (left) colour encodes whether the feature value was high (pink) or low (blue) for that sample.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/summary_plot.png" alt="SHAP Summary Beeswarm Plot ranked by feature impact" />
+      <div class="fig-caption">SHAP Summary Plot — all features ranked by impact on malignancy probability</div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">Reading the Plot</div>
+      <p style="margin:0; font-size:0.91rem;">
+        For <strong>area_worst</strong> (top row) the pink dots cluster to the right, indicating that large tumour areas strongly increase malignancy probability. The blue dots fall to the left indicating that small tumour areas push predictions toward benign. This dual relationship is visible in a single row for every feature simultaneously.
+      </p>
+    </div>
+
+    <h3>SHAP Bar Plot Feature Importance</h3>
+    <p>
+      The bar plot ranks features by their average absolute SHAP value, capturing overall importance regardless of direction.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/bar_plot.png" alt="SHAP Bar Plot showing mean absolute SHAP values per feature" />
+      <div class="fig-caption">SHAP Bar Plot average absolute feature contribution to model output</div>
+    </div>
+
+    <p>
+      The top five features are <strong>area_worst</strong>, <strong>concave points_worst</strong>, <strong>radius_worst</strong>, <strong>concave points_mean</strong>, and <strong>perimeter_worst</strong>. All five measure tumour size or shape irregularity, representing that the model has learnt real medical patterns rather than relying on misleading shortcuts.
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num" style="font-size:1.25rem; color:var(--accent);">area_worst</div>
+        <div class="stat-label">Top feature by SHAP</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num blue">0.067</div>
+        <div class="stat-label">Mean |SHAP| value</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num amber">5</div>
+        <div class="stat-label">Size/shape features in top 5</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="local">
+    <div class="section-label">08 — Local Explanation</div>
+    <h2>One Patient, One Prediction, Explained Fully</h2>
+
+    <p>
+      Global rankings tell us what matters on average. A clinician caring for a specific patient needs to know what drove that individual prediction. The SHAP Waterfall plot answers exactly that.
+    </p>
+
+    <h3>Waterfall Plot A Benign Case Explained</h3>
+    <p>
+      The waterfall plot begins at the models baseline probability (E[f(X)] = 0.373) and traces a step-by-step path to the final prediction (f(x) = 0.01). In this case, all visible contributions are negative (blue), meaning each feature reduces the probability of malignancy. This results in a strong shift toward a benign classification.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/waterfall_plot.png" alt="SHAP Waterfall Plot for a single benign prediction showing feature contributions" />
+      <div class="fig-caption">Waterfall Plot local explanation for Patient 1 (predicted benign, f(x) = 0.01)</div>
+    </div>
+
+    <div class="waterfall-legend">
+      <div class="wl-item">
+        <div class="wl-dot" style="background:#3b82f6;"></div>
+        Blue bars — features reducing malignancy probability
+      </div>
+    </div>
+
+    <div class="callout blue" style="margin-top:1.25rem;">
+      <div class="callout-title">Clinical Explanation</div>
+      <p style="margin:0; font-size:0.91rem;">
+        This patients <strong>area_worst = 510.5</strong> (small tumour, SHAP = -0.06), <strong>concave points_worst = 0.09</strong> (low irregularity, SHAP = -0.04), and <strong>perimeter_worst = 83.74</strong> (compact boundary, SHAP = -0.04) collectively drove the prediction far below the malignancy. The model's reasoning mirrors what a pathologist would note a small, smooth, regularly-shaped mass is likely to be benign.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="dependence">
+    <div class="section-label">09 — Feature Behaviour</div>
+    <h2>How Does Tumour Area Affect Risk?</h2>
+
+    <p>
+      The SHAP Dependence Plot focusses on each feature, <strong>area_worst</strong>, and shows how its value effects prediction. Each points is also coloured by another feature (<em>concavity_worst</em>) to show how they interact with each other.
+    </p>
+
+    <div class="fig-wrap">
+      <img src="images/dependence_plot.png" alt="SHAP Dependence Plot for area_worst coloured by concavity_worst" />
+      <div class="fig-caption">Dependence Plot area_worst (x-axis) vs SHAP value, coloured by concavity_worst</div>
+    </div>
+
+    <div class="callout purple">
+      <div class="callout-title">Three Things This Plot Tells Us</div>
+      <p style="margin:0; font-size:0.91rem; margin-bottom:0.5rem;">
+        <strong>1. Threshold effect:</strong> SHAP values are strongly negative below area approximately 800 (reducing malignancy risk) and sharply positive above it. The model has learned a clinically meaningful boundary for tumour size.
+      </p>
+      <p style="margin:0; font-size:0.91rem; margin-bottom:0.5rem;">
+        <strong>2. Interaction effect:</strong> Among tumours with similar areas, those with higher concavity (pink dots) receive higher SHAP values, indicating that shape irregularity increases the size signal.
+      </p>
+      <p style="margin:0; font-size:0.91rem;">
+        <strong>3. Clinical Explanation:</strong> Pathologists have long documented that large irregular masses carry higher malignancy risk. The model learned this same pattern directly from the data.
+      </p>
+    </div>
+
+    <h3>Before and After Explainability</h3>
+
+    <div class="two-col">
+      <div class="callout rose" style="margin:0;">
+        <div class="callout-title">Before SHAP</div>
+        <ul class="insight-list" style="margin-top:0.5rem;">
+          <li>Prediction delivered: <em>"Malignant"</em></li>
+          <li>No reasoning available</li>
+          <li>Errors impossible to diagnose</li>
+          <li>Clinician trust is low</li>
+          <li>There are NO Regulatory justification</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin:0;">
+        <div class="callout-title">After SHAP</div>
+        <ul class="insight-list" style="margin-top:0.5rem;">
+          <li>Feature contributions are quantified</li>
+          <li>Individual decisions were auditable</li>
+          <li>Errors traceable to specific features</li>
+          <li>Clinician trust is based on evidence</li>
+          <li>Regulatory justification are documented</li>
+        </ul>
+      </div>
+    </div>
+
+    <p style="margin-top:1.5rem;">
+      SHAP does not change the model so Random Forest remains exactly as accurate. What changes is our <em>Understanding</em> to it. A prediction without explanation is an claim, But with SHAP value its becomes like something that is examined, challenged, and trusted.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+  <section class="section" id="insights">
+      <div class="section-label">10 — Key Insights</div>
+      <h2>What insights have we gained?</h2>
+
+      <div class="insight-grid">
+        
+        <div class="insight-item">
+          <strong>Tumour size and shape matter most.</strong>
+          <p>The most important features are about tumour size and irregular shape, matching real medical knowledge.</p>
+        </div>
+
+        <div class="insight-item">
+          <strong>Extreme values are more important.</strong>
+          <p>The model focuses on worst values rather than averages, meaning it looks at the most abnormal cases.</p>
+        </div>
+
+        <div class="insight-item">
+          <strong>The model is medically reliable.</strong>
+          <p>The important features make medical sense, showing the model is not using misleading patterns.</p>
+        </div>
+
+        <div class="insight-item">
+          <strong>Each prediction can be explained.</strong>
+          <p>Every prediction can be broken into clear reasons, helping doctors understand and trust it.</p>
+        </div>
+
+      </div>
+  </section>
+  
+
+  <div class="divider"></div>
+
+  <section class="section" id="ethics">
+    <div class="section-label">11 — Ethical Considerations</div>
+    <h2>Why Transparency is a Moral Obligation</h2>
+
+    <div class="ethics-strip">
+      <p>
+        Using a machine learning model in healthcare without explanation is not just a small mistake, it is an <strong>ethical failure</strong>. When a model helps decide treatments like chemotherapy or surgery, both doctors and patients need to understand why. Without explanations, it becomes hard to support <em>informed consent</em>, which is a key part of medical ethics.
+      </p>
+      <p>
+        The three false negatives in this model show a serious issue: real cancers that were missed. Without SHAP, we cannot understand why these mistakes happened or if there is a pattern behind them. <strong>Explainability helps us learn from these errors.</strong>
+      </p>
+      <p style="margin-bottom:0;">
+        Laws like the <strong>EU AI Act</strong> are starting to require high-risk AI systems to clearly explain their decisions. So, using SHAP is not just a good practice, it is becoming a requirement.
+      </p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num rose">3</div>
+        <div class="stat-label">False negatives — missed cancers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num amber">0</div>
+        <div class="stat-label">False positives — unnecessary alarms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">GDPR</div>
+        <div class="stat-label">Right to explanation (Art. 22)</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="shap-limits">
+    <div class="section-label">12 — Limitations of SHAP</div>
+    <h2>Limitations of SHAP</h2>
+
+    <p>
+      SHAP is among the most theoretically grounded explainability methods available but everyone should be aware of its limitations:
+    </p>
+
+    <ul class="insight-list">
+      <li>
+        <strong>Computational cost.</strong> Exact Shapley computation is exponential in the number of features. For large datasets or complex models approximate variants such as KernelSHAP are required each introducing their own criticalities.
+      </li>
+      <li>
+        <strong>Correlation sensitivity.</strong> When features are highly correlated for instance radius and perimeter, SHAP values can be distributed unevenly between them making individual attributions less straightforward to interpret.
+      </li>
+      <li>
+        <strong>Explanation is not causation.</strong> A high SHAP value means the model relies on a feature it does not mean that feature causally determines malignancy.
+      </li>
+      <li>
+        <strong>Visual complexity.</strong> Plots with many features can be hard to understand for non-technical people without clear and simple presentation.
+      </li>
+    </ul>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="conclusion">
+    <div class="section-label">13 — Conclusion</div>
+    <h2>Conclusion</h2>
+
+    <p>
+    This tutorial showed that a Random Forest model can accurately distinguish between malignant and benign tumours, and that SHAP helps us understand how these predictions are made. We move from a black box model to proper understanding, where decisions can be clearly explained and trusted.
+    </p>
+    <p>
+      Explainability is not optional it is essential for using machine learning responsibly. SHAP helps us understand how the model makes decisions, allowing doctors and users to trust and use AI as a helpful tool.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="reflection">
+    <div class="section-label">14 — Personal Reflection</div>
+    <h2>What This Project Changed for Me</h2>
+
+    <div class="reflection">
+      <p>
+        Before this project I focused only on model accuracy. Seeing SHAP explain predictions clearly showing that larger and more irregular tumours increase risk made the importance of interpretability much more clear and relevant.
+      </p>
+      <p style="margin-bottom:0;">
+        The three false negatives are especially important to remember. They show the real risk of relying on a model without understanding it. SHAP does not remove errors, but it helps us identify and understand them, which is essential for responsible machine learning.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="references">
+    <div class="section-label">15 — References</div>
+    <h2>Sources and Further Reading</h2>
+
+    <ol class="ref-list">
+      <li>
+        Lundberg, S. M., &amp; Lee, S.-I. (2017). A unified approach to interpreting model predictions. <em>Advances in Neural Information Processing Systems, 30</em>.
+        <a href="https://proceedings.neurips.cc/paper/2017/hash/8a20a8621978632d76c43dfd28b67767-Abstract.html" target="_blank" rel="noopener">NeurIPS Proceedings</a>
+      </li>
+      <li>
+        Molnar, C. (2022). <em>Interpretable Machine Learning: A Guide for Making Black Box Models Explainable</em> (2nd ed.).
+        <a href="https://christophm.github.io/interpretable-ml-book/" target="_blank" rel="noopener">christophm.github.io</a>
+      </li>
+      <li>
+        SHAP Documentation. (2023). <em>SHAP: SHapley Additive exPlanations</em>.
+        <a href="https://shap.readthedocs.io/" target="_blank" rel="noopener">shap.readthedocs.io</a>
+      </li>
+      <li>
+        Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. <em>Journal of Machine Learning Research, 12</em>, 2825-2830.
+        <a href="https://scikit-learn.org/stable/documentation.html" target="_blank" rel="noopener">scikit-learn.org</a>
+      </li>
+      <li>
+        Wolberg, W. H., Street, W. N., &amp; Mangasarian, O. L. (1995). <em>Breast Cancer Wisconsin (Diagnostic) Dataset</em>. UCI Machine Learning Repository.
+        <a href="https://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+(Diagnostic)" target="_blank" rel="noopener">UCI Repository</a>
+      </li>
+      <li>
+        Shapley, L. S. (1953). A value for n-person games. In H. Kuhn &amp; A. Tucker (Eds.), <em>Contributions to the Theory of Games</em> (Vol. 2, pp. 307-317). Princeton University Press.
+      </li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  <span>Machine Learning Tutorial · Breast Cancer Explainability · SHAP</span>
+  &nbsp;·&nbsp;
+  <span>Random Forest</span>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver(
+    entries => entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); }
+    }),
+    { threshold: 0.07 }
+  );
+  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
